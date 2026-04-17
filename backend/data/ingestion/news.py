@@ -1,0 +1,183 @@
+"""
+news.py — NewsAPI disruption signal ingestion + HuggingFace NER/sentiment scoring.
+Fetches supply chain news, scores severity 1–5, extracts entities.
+Publishes to Redis Streams: stream:news
+"""
+import asyncio
+import json
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+import httpx
+import redis.asyncio as aioredis
+
+from backend.config import NEWSAPI_KEY, HF_API_TOKEN, REDIS_URL, NEWS_POLL_INTERVAL_SEC, FEATURES
+
+logger = logging.getLogger("chainmind.news")
+
+NEWSAPI_BASE = "https://newsapi.org/v2/everything"
+HF_SENTIMENT_URL = "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english"
+HF_NER_URL = "https://api-inference.huggingface.co/models/dslim/bert-base-NER"
+
+SEARCH_QUERY = (
+    "supply chain disruption OR port strike OR logistics delay "
+    "OR semiconductor shortage OR shipping congestion"
+)
+
+
+async def _hf_request(client: httpx.AsyncClient, url: str, payload: dict) -> Any:
+    """Call HuggingFace Inference API."""
+    if not HF_API_TOKEN:
+        return None
+    headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+    try:
+        resp = await client.post(url, json=payload, headers=headers, timeout=30.0)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as exc:
+        logger.warning("HuggingFace request failed: %s", exc)
+        return None
+
+
+def _sentiment_to_score(sentiment_result: Any) -> tuple[float, str]:
+    """Convert HF sentiment output to numerical score."""
+    if not sentiment_result or not isinstance(sentiment_result, list):
+        return 0.5, "NEUTRAL"
+    best = max(sentiment_result, key=lambda x: x.get("score", 0))
+    label = best.get("label", "NEUTRAL")
+    score = best.get("score", 0.5)
+    # For supply chain news: NEGATIVE sentiment = higher disruption severity
+    if label == "NEGATIVE":
+        return score, "NEGATIVE"
+    return 1.0 - score, "POSITIVE"
+
+
+def _severity_from_sentiment(sentiment_score: float) -> int:
+    """Map 0–1 disruption sentiment score to severity 1–5."""
+    if sentiment_score >= 0.85:
+        return 5
+    elif sentiment_score >= 0.70:
+        return 4
+    elif sentiment_score >= 0.55:
+        return 3
+    elif sentiment_score >= 0.35:
+        return 2
+    return 1
+
+
+def _extract_entities_from_ner(ner_result: Any) -> list[str]:
+    """Pull ORG/LOC entities from HF NER output."""
+    if not ner_result or not isinstance(ner_result, list):
+        return []
+    entities = []
+    for item in ner_result:
+        if isinstance(item, dict) and item.get("entity_group") in ("ORG", "LOC", "PER"):
+            word = item.get("word", "").strip()
+            if word and len(word) > 2:
+                entities.append(word)
+    # Deduplicate
+    return list(dict.fromkeys(entities))
+
+
+async def fetch_and_score_news(client: httpx.AsyncClient) -> list[dict]:
+    """Fetch articles from NewsAPI and score them."""
+    if not FEATURES["news_feed"]:
+        logger.warning("News feed disabled — NEWSAPI_KEY not set.")
+        return []
+
+    params = {
+        "q": SEARCH_QUERY,
+        "language": "en",
+        "sortBy": "publishedAt",
+        "pageSize": 20,
+        "from": (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat(),
+        "apiKey": NEWSAPI_KEY,
+    }
+
+    try:
+        resp = await client.get(NEWSAPI_BASE, params=params, timeout=20.0)
+        resp.raise_for_status()
+        articles = resp.json().get("articles", [])
+    except Exception as exc:
+        logger.error("NewsAPI fetch failed: %s", exc)
+        return []
+
+    scored = []
+    for article in articles[:10]:  # Rate limit: score top 10
+        text = f"{article.get('title', '')}. {article.get('description', '')}"
+        if not text.strip():
+            continue
+
+        # Sentiment
+        sentiment_raw = await _hf_request(client, HF_SENTIMENT_URL, {"inputs": text[:512]})
+        senti_score, senti_label = _sentiment_to_score(sentiment_raw)
+        severity = _severity_from_sentiment(senti_score)
+
+        # NER
+        ner_raw = await _hf_request(client, HF_NER_URL, {"inputs": text[:512]})
+        entities = _extract_entities_from_ner(ner_raw)
+
+        # Expiry: severity-based (high severity = longer impact)
+        expiry_days = severity * 3
+        expiry_date = (
+            datetime.now(timezone.utc) + timedelta(days=expiry_days)
+        ).isoformat()
+
+        scored.append(
+            {
+                "title": article.get("title", ""),
+                "source": article.get("source", {}).get("name", "Unknown"),
+                "url": article.get("url", ""),
+                "published_at": article.get("publishedAt", ""),
+                "sentiment_label": senti_label,
+                "sentiment_score": round(senti_score, 3),
+                "severity": severity,
+                "entities": entities,
+                "expiry_date": expiry_date,
+                "_fetched_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+    return scored
+
+
+async def poll_news_once() -> list[dict]:
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    async with httpx.AsyncClient() as client:
+        articles = await fetch_and_score_news(client)
+
+    from backend.db.database import AsyncSessionLocal
+    from backend.db.schema import Disruption
+
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            for article in articles:
+                await redis.xadd("stream:news", {"data": json.dumps(article)}, maxlen=200)
+
+                # Persist high-severity signals to DB as potential disruptions
+                if article.get("severity", 0) >= 3:
+                    dis = Disruption(
+                        type="News Signal",
+                        location=", ".join(article.get("entities", ["Global"])),
+                        severity="High" if article["severity"] >= 4 else "Medium",
+                        description=article["title"],
+                        impact_score=article["sentiment_score"] * 100,
+                        resolved=False
+                    )
+                    session.add(dis)
+        await session.commit()
+
+    await redis.aclose()
+    logger.info("News poll complete: %d articles fetched and saved to DB.", len(articles))
+    return articles
+
+
+async def run_news_poller() -> None:
+    logger.info("Starting news poller (interval: %ds).", NEWS_POLL_INTERVAL_SEC)
+    while True:
+        try:
+            await poll_news_once()
+        except Exception as exc:
+            logger.error("News poll error: %s", exc)
+        await asyncio.sleep(NEWS_POLL_INTERVAL_SEC)
