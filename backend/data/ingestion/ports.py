@@ -20,38 +20,95 @@ logger = logging.getLogger("chainmind.ports")
 
 # Congestion baseline per port (0–100), updated by polls
 _CONGESTION_STATE: dict[str, float] = {p["id"]: 30.0 for p in KEY_PORTS}
+# Store real-time vessel positions for map visualization
+_LIVE_VESSELS: list[dict] = []
 
+
+async def _try_aisstream():
+    print("DEBUG: _try_aisstream starting...")
+    from backend.config import AISTREAM_API_KEY
+    if not AISTREAM_API_KEY:
+        print("DEBUG: Aisstream API key missing!")
+        return
+
+    import websockets
+    import json
+    from datetime import datetime
+
+    # Simple radius-based congestion tracking (vessels within ~50km)
+    RADIUS_KM = 50.0
+
+    async def _listen():
+        while True:
+            try:
+                print(f"DEBUG: Attempting AIS connect to wss://stream.aisstream.io/v0/stream ...")
+                async with websockets.connect("wss://stream.aisstream.io/v0/stream") as websocket:
+                    print("DEBUG: AIS WebSocket opened. Sending subscription...")
+                    subscribe_msg = {
+                        "APIKey": AISTREAM_API_KEY,
+                        "BoundingBoxes": [[[5.0, 60.0], [35.0, 100.0]]],
+                        "FiltersShipType": [35, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80]
+                    }
+
+                    await websocket.send(json.dumps(subscribe_msg))
+                    print("DEBUG: AIS Subscription sent. Waiting for messages...")
+                    logger.info("Aisstream.io: Connected and subscribed.")
+
+                    vessel_counts = {p["id"]: 0 for p in KEY_PORTS}
+                    start_time = datetime.now()
+
+                    async for message in websocket:
+                        print("DEBUG: AIS RAW MESSAGE RECEIVED!")
+                        msg = json.loads(message)
+                        # Log every 50th message to avoid spam but confirm activity
+                        if random.random() < 0.02:
+                            logger.info("Aisstream.io: Real-time vessel message received: %s", msg.get("MetaData", {}))
+                            print(f"DEBUG: AIS message received for {msg.get('MetaData', {}).get('ShipName')}")
+                        if "MetaData" in msg:
+                            lat = msg["MetaData"].get("latitude")
+                            lon = msg["MetaData"].get("longitude")
+                            mmsi = msg["MetaData"].get("MMSI")
+                            ship_name = msg["MetaData"].get("ShipName", "Unknown")
+
+                            if lat and lon:
+                                # Update live vessel list (keep last 200)
+                                _LIVE_VESSELS.append({
+                                    "id": mmsi,
+                                    "name": ship_name,
+                                    "lat": lat,
+                                    "lon": lon,
+                                    "type": "cargo",
+                                    "timestamp": datetime.now().isoformat()
+                                })
+                                if len(_LIVE_VESSELS) > 200:
+                                    _LIVE_VESSELS.pop(0)
+
+                                from backend.optimization.routing import haversine
+                                for port in KEY_PORTS:
+                                    dist = haversine(lat, lon, port["lat"], port["lon"])
+                                    if dist < RADIUS_KM:
+                                        vessel_counts[port["id"]] += 1
+                        
+                        if (datetime.now() - start_time).seconds > 30:
+                            for pid, count in vessel_counts.items():
+                                congestion = min(100.0, (count / 50.0) * 100.0)
+                                _CONGESTION_STATE[pid] = (_CONGESTION_STATE[pid] * 0.7) + (congestion * 0.3)
+                            
+                            vessel_counts = {p["id"]: 0 for p in KEY_PORTS}
+                            start_time = datetime.now()
+            except Exception as exc:
+                logger.warning("Aisstream.io connection lost: %s. Retrying in 10s...", exc)
+                await asyncio.sleep(10)
+
+    # This should be run as a background task. 
+    # For the poller integration, we'll just return the current state.
+    # We'll start this task in run_port_poller.
+    asyncio.create_task(_listen())
 
 async def _try_marinetraffic(client: httpx.AsyncClient) -> list[dict]:
     """Fetch vessel counts from MarineTraffic if key available."""
     if not MARINETRAFFIC_KEY:
         return []
-
-    results = []
-    for port in KEY_PORTS:
-        try:
-            resp = await client.get(
-                "https://services.marinetraffic.com/api/exportvessels/v:8",
-                params={
-                    "v": 8,
-                    "protocol": "jsono",
-                    "msgtype": "simple",
-                    "portid": port["id"],
-                    "apikey": MARINETRAFFIC_KEY,
-                },
-                timeout=15.0,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            vessel_count = len(data.get("data", []))
-            # Normalize to 0–100 congestion index (heuristic: >80 vessels = 100)
-            congestion = min(100.0, vessel_count / 80.0 * 100.0)
-            _CONGESTION_STATE[port["id"]] = congestion
-            results.append(_build_port_record(port, congestion, "marinetraffic"))
-        except Exception as exc:
-            logger.warning("MarineTraffic fetch failed for %s: %s", port["id"], exc)
-
-    return results
 
 
 def _build_port_record(port: dict, congestion: float, source: str) -> dict:
@@ -84,18 +141,23 @@ async def poll_ports_once() -> list[dict]:
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     results = []
 
-    if FEATURES["port_marine"]:
-        async with httpx.AsyncClient() as client:
-            results = await _try_marinetraffic(client)
+    # Note: Aisstream.io updates _CONGESTION_STATE in background
+    # We still fetch regular records here for the stream.
 
-    # Fill in any missing ports with simulated values (clearly labeled)
-    existing_port_ids = {r["port_id"] for r in results}
+    # Fill in port records from current state
     for port in KEY_PORTS:
-        if port["id"] not in existing_port_ids:
-            new_cong = _weather_seeded_congestion(port, _CONGESTION_STATE[port["id"]])
-            _CONGESTION_STATE[port["id"]] = new_cong
-            record = _build_port_record(port, new_cong, "simulated")
-            results.append(record)
+        new_cong = _CONGESTION_STATE[port["id"]]
+        
+        # Determine source label
+        from backend.config import AISTREAM_API_KEY
+        # If the value is still the baseline 30.0, we mark as 'initializing' or 'no_activity'
+        if new_cong == 30.0:
+            source = "aisstream (waiting)" if AISTREAM_API_KEY else "manual_baseline"
+        else:
+            source = "aisstream (real-time)"
+            
+        record = _build_port_record(port, new_cong, source)
+        results.append(record)
 
     for record in results:
         await redis.xadd("stream:ports", {"data": json.dumps(record)}, maxlen=500)
@@ -107,9 +169,18 @@ async def poll_ports_once() -> list[dict]:
 
 async def run_port_poller() -> None:
     logger.info("Starting port congestion poller (interval: %ds).", PORT_POLL_INTERVAL_SEC)
+    
+    # Start Aisstream real-time tracker if key available
+    await _try_aisstream()
+    
     while True:
         try:
             await poll_ports_once()
         except Exception as exc:
             logger.error("Port poll error: %s", exc)
         await asyncio.sleep(PORT_POLL_INTERVAL_SEC)
+
+
+def get_live_vessels() -> list[dict]:
+    """Expose live vessel buffer for API."""
+    return _LIVE_VESSELS

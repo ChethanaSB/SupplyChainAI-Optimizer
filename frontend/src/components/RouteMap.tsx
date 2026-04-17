@@ -2,39 +2,37 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { optimizeRouting } from "@/lib/api";
-import { RoutingData, RouteArc } from "@/lib/types";
-import { Truck, Navigation, DollarSign, Leaf, Zap, Globe } from "lucide-react";
+import { Truck, Navigation, DollarSign, Leaf, Zap, Globe, Anchor } from "lucide-react";
+import { getKPIDashboard, optimizeRouting, getLiveVessels } from "@/lib/api";
 
 // Dynamically import Leaflet components to avoid SSR issues
 const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
 const Polyline = dynamic(() => import("react-leaflet").then(mod => mod.Polyline), { ssr: false });
 const CircleMarker = dynamic(() => import("react-leaflet").then(mod => mod.CircleMarker), { ssr: false });
+const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
 const Tooltip = dynamic(() => import("react-leaflet").then(mod => mod.Tooltip), { ssr: false });
 
-// Mock coordinates for Suppliers and Plants (Centralized for dashboard feel)
-const LOCATIONS: Record<string, [number, number]> = {
-  "SUP-01": [52.52, 13.40], // Berlin
-  "SUP-02": [48.85, 2.35],  // Paris
-  "SUP-03": [51.50, -0.12], // London
-  "SUP-04": [41.38, 2.17],  // Barcelona
-  "SUP-05": [35.68, 139.65], // Tokyo
-  "SUP-06": [31.23, 121.47], // Shanghai
-  "PLT-01": [50.11, 8.68],  // Frankfurt
-  "PLT-02": [45.46, 9.18],  // Milan
-  "PLT-03": [40.71, -74.00], // New York
-};
+// Dynamic routing visualization centered on India
 
 export default function RouteMap() {
   const [data, setData] = useState<RoutingData | null>(null);
+  const [vessels, setVessels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
 
   useEffect(() => {
-    optimizeRouting({})
+    // Initial data fetch
+    optimizeRouting([])
       .then(setData)
       .finally(() => setLoading(false));
+
+    // Polling for live vessels
+    const interval = setInterval(() => {
+        getLiveVessels().then(setVessels);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   if (loading || !data) {
@@ -42,12 +40,12 @@ export default function RouteMap() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[700px]">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[800px]">
       {/* Route List Sidebar */}
       <div className="lg:col-span-1 glass-card rounded-2xl flex flex-col overflow-hidden">
         <div className="p-6 border-b border-border bg-secondary/20">
-          <h3 className="text-xl font-bold tracking-tight">Active Logistics</h3>
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-1">Multi-Objective Optimization</p>
+          <h3 className="text-xl font-bold tracking-tight">ZF Fleet & Routes</h3>
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-1">Tier-1 Node Management</p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
@@ -107,15 +105,28 @@ export default function RouteMap() {
       </div>
 
       {/* Map View */}
-      <div className="lg:col-span-2 glass-card rounded-2xl overflow-hidden relative group">
-        <div className="absolute top-6 left-6 z-[1000] flex gap-3">
-            <div className="bg-background/80 backdrop-blur-md px-4 py-2 rounded-xl border border-border flex items-center gap-2 shadow-xl">
-               <Globe size={16} className="text-primary animate-pulse" />
-               <span className="text-xs font-bold tracking-tight">Active Network Monitoring</span>
+      <div className="lg:col-span-3 glass-card rounded-2xl overflow-hidden relative group">
+        <div className="absolute top-6 left-6 z-[1000] flex flex-col gap-3">
+            <div className="bg-background/80 backdrop-blur-md px-4 py-2 rounded-xl border border-border flex items-center gap-3 shadow-xl pointer-events-auto">
+               <Globe size={18} className="text-primary animate-pulse" />
+               <div className="flex flex-col">
+                 <span className="text-xs font-bold tracking-tight">ZF Global Shipments</span>
+                 <span className="text-[10px] text-primary/80 font-medium">Sea-Distances.org Optimized</span>
+               </div>
             </div>
-            <div className="bg-background/80 backdrop-blur-md px-4 py-2 rounded-xl border border-border flex items-center gap-2 shadow-xl">
-               <Leaf size={16} className="text-status-green" />
-               <span className="text-xs font-bold tracking-tight">Eco-Routing Active</span>
+            <div className="bg-background/80 backdrop-blur-md px-4 py-2 rounded-xl border border-border flex items-center gap-3 shadow-xl">
+               <Anchor size={18} className="text-sky-400" />
+               <div className="flex flex-col">
+                 <span className="text-xs font-bold tracking-tight">Active Sea Traffic</span>
+                 <span className="text-[10px] text-sky-400/80 font-medium">{vessels.length} Vessels Tracked</span>
+               </div>
+            </div>
+        </div>
+        
+        <div className="absolute top-6 right-6 z-[1000] pointer-events-none">
+            <div className="bg-background/60 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border/50 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)] animate-pulse"></div>
+                <span className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground">ZF System Live</span>
             </div>
         </div>
 
@@ -123,9 +134,9 @@ export default function RouteMap() {
           {/* Leaflet CSS is handled via CDN or global import in root */}
           <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossOrigin="" />
           
-          <MapContainer 
-            center={[40, 0]} 
-            zoom={2} 
+            <MapContainer 
+            center={[20.5937, 78.9629]} 
+            zoom={5} 
             className="w-full h-full" 
             zoomControl={false}
             attributionControl={false}
@@ -134,30 +145,88 @@ export default function RouteMap() {
               url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             />
             
+            {/* Draw Routes */}
             {data.routes.map((route, idx) => {
-              const start = LOCATIONS[route.supplier_id] || [0, 0];
-              const end = LOCATIONS[route.plant_id] || [0, 0];
+              const startLat = route.origin_lat;
+              const startLon = route.origin_lon;
+              const endLat = route.dest_lat;
+              const endLon = route.dest_lon;
+
+              if (typeof startLat !== 'number' || typeof startLon !== 'number' ||
+                  typeof endLat !== 'number' || typeof endLon !== 'number' ||
+                  isNaN(startLat) || isNaN(startLon) || isNaN(endLat) || isNaN(endLon)) {
+                return null;
+              }
+              
+              const start: [number, number] = [startLat, startLon];
+              const end: [number, number] = [endLat, endLon];
               const isSelected = selectedRoute === `${route.supplier_id}-${route.plant_id}`;
               
+              // Calculate truck position based on current time
+              const time = Date.now() / 10000; // Slow movement
+              const progress = (time + idx * 0.2) % 1; // Different offset per route
+              const truckLat = startLat + (endLat - startLat) * progress;
+              const truckLon = startLon + (endLon - startLon) * progress;
+
               return (
                 <React.Fragment key={idx}>
                   <Polyline 
                     positions={[start, end]} 
-                    color={isSelected ? "var(--primary)" : "var(--primary)"} 
-                    weight={isSelected ? 4 : 2}
-                    opacity={isSelected ? 1 : 0.3}
+                    color={isSelected ? "var(--primary)" : "#334155"} 
+                    weight={isSelected ? 3 : 1}
+                    opacity={isSelected ? 1 : 0.4}
                   />
                   
+                  {/* Origin */}
                   <CircleMarker center={start} radius={isSelected ? 6 : 4} color="var(--primary)" fillColor="var(--primary)" fillOpacity={1}>
-                    <Tooltip direction="top" className="bg-card border-border text-foreground">Supplier {route.supplier_id}</Tooltip>
+                    <Tooltip direction="top">ZF {route.supplier_id}</Tooltip>
                   </CircleMarker>
                   
+                  {/* Destination */}
                   <CircleMarker center={end} radius={isSelected ? 6 : 4} color="var(--status-amber)" fillColor="var(--status-amber)" fillOpacity={1}>
-                    <Tooltip direction="top">Plant {route.plant_id}</Tooltip>
+                    <Tooltip direction="top">ZF {route.plant_id}</Tooltip>
+                  </CircleMarker>
+
+                  {/* Moving Truck (Simulated Live) */}
+                  <CircleMarker 
+                    center={[truckLat, truckLon]} 
+                    radius={3} 
+                    color="white" 
+                    fillColor="var(--primary)" 
+                    fillOpacity={1}
+                  >
+                     <Tooltip direction="right" permanent={isSelected}>
+                        <div className="flex items-center gap-2">
+                             <Truck size={10} className="text-primary" />
+                             <span className="text-[9px] font-bold">ZF-TRANS-{idx+100}</span>
+                        </div>
+                     </Tooltip>
                   </CircleMarker>
                 </React.Fragment>
               );
             })}
+
+            {/* Draw Real-Time AIS Vessels */}
+            {vessels.filter(v => v.lat != null && v.lon != null).map((v, i) => (
+                <CircleMarker 
+                    key={`vessel-${i}`} 
+                    center={[v.lat, v.lon]} 
+                    radius={4} 
+                    color="#0ea5e9" 
+                    fillColor="#0ea5e9" 
+                    fillOpacity={0.6}
+                    className="animate-pulse"
+                >
+                    <Tooltip direction="bottom">
+                        <div className="p-1">
+                            <p className="font-bold text-[10px] uppercase">{v.name}</p>
+                            <div className="flex items-center gap-1 text-[8px] text-sky-400 font-bold">
+                                <Anchor size={8} /> LIVE AIS TRACKING
+                            </div>
+                        </div>
+                    </Tooltip>
+                </CircleMarker>
+            ))}
           </MapContainer>
         </div>
       </div>

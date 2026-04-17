@@ -18,8 +18,8 @@ logger = logging.getLogger("chainmind.market")
 
 SYMBOLS = {
     "USO": "crude_oil",
-    "X": "steel",
-    "SOXX": "semiconductors",
+    "RELIANCE.BSE": "energy_industrial",
+    "TATASTEEL.BSE": "steel",
 }
 
 AV_BASE = "https://www.alphavantage.co/query"

@@ -17,7 +17,6 @@ import {
 import DashboardOverview from "@/components/DashboardOverview";
 import ForecastPanel from "@/components/ForecastPanel";
 import RouteMap from "@/components/RouteMap";
-import ScenarioSimulator from "@/components/ScenarioSimulator";
 import DisruptionRadar from "@/components/DisruptionRadar";
 import LiveFeed from "@/components/LiveFeed";
 
@@ -28,10 +27,9 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const navItems = [
-    { id: "overview", label: "Network Overview", icon: LayoutDashboard },
+    { id: "overview", label: "ZF Logistics Control", icon: LayoutDashboard },
     { id: "forecast", label: "Demand Forecasting", icon: TrendingUp },
-    { id: "routes", label: "Optimized Routing", icon: MapIcon },
-    { id: "scenarios", label: "Scenario Simulator", icon: Zap },
+    { id: "routes", label: "Live Traffic & Routing", icon: MapIcon },
     { id: "radar", label: "Disruption Radar", icon: Activity },
   ];
 
@@ -43,7 +41,7 @@ export default function Home() {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-background">
             <ShieldCheck size={20} weight="bold" />
           </div>
-          {sidebarOpen && <span className="font-bold text-xl tracking-tight">ChainMind</span>}
+          {sidebarOpen && <span className="font-bold text-xl tracking-tight">ZF ChainMind</span>}
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-2">
@@ -67,7 +65,7 @@ export default function Home() {
         <div className="p-4 border-t border-border">
           <button className="w-full flex items-center gap-4 p-3 text-muted-foreground hover:text-foreground transition-all">
             <Settings size={20} />
-            {sidebarOpen && <span>System Config</span>}
+            {sidebarOpen && <span>ZF System Config</span>}
           </button>
         </div>
       </aside>
@@ -87,7 +85,7 @@ export default function Home() {
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input 
                 type="text" 
-                placeholder="Search SKU, Route or Supplier..." 
+                placeholder="Search ZF SKU, Route or Supplier..." 
                 className="bg-transparent border-none outline-none pl-10 pr-4 py-2 w-full text-sm placeholder:text-muted-foreground"
               />
             </div>
@@ -101,11 +99,11 @@ export default function Home() {
             </button>
             <div className="flex items-center gap-3 pl-6 border-l border-border">
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Logistics Lead</p>
-                <p className="text-sm font-semibold">Supply Chain Admin</p>
+                <p className="text-xs text-muted-foreground">ZF Logistics Admin</p>
+                <p className="text-sm font-semibold">ZF User</p>
               </div>
               <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center font-bold text-primary">
-                CM
+                ZF
               </div>
             </div>
           </div>
@@ -117,7 +115,6 @@ export default function Home() {
             {activeTab === "overview" && <DashboardOverview />}
             {activeTab === "forecast" && <ForecastPanel />}
             {activeTab === "routes" && <RouteMap />}
-            {activeTab === "scenarios" && <ScenarioSimulator />}
             {activeTab === "radar" && <DisruptionRadar />}
           </div>
         </div>

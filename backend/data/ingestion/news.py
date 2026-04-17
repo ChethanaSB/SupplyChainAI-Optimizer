@@ -21,8 +21,9 @@ HF_SENTIMENT_URL = "https://api-inference.huggingface.co/models/distilbert-base-
 HF_NER_URL = "https://api-inference.huggingface.co/models/dslim/bert-base-NER"
 
 SEARCH_QUERY = (
-    "supply chain disruption OR port strike OR logistics delay "
-    "OR semiconductor shortage OR shipping congestion"
+    "ZF India logistics OR ZF Pune plant disruption "
+    "OR ZF Chennai production delay OR ZF Coimbatore industrial "
+    "OR Indian automotive supply chain OR ZF mobility systems India"
 )
 
 

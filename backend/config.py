@@ -31,6 +31,8 @@ MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:50
 ALPHA_VANTAGE_KEY: str | None = os.getenv("ALPHA_VANTAGE_KEY")
 NEWSAPI_KEY: str | None = os.getenv("NEWSAPI_KEY")
 MARINETRAFFIC_KEY: str | None = os.getenv("MARINETRAFFIC_KEY")
+AISTREAM_API_KEY: str | None = os.getenv("AISTREAM_API_KEY")
+SEADISTANCES_API_KEY: str | None = os.getenv("SEADISTANCES_API_KEY")
 SEAROUTES_API_KEY: str | None = os.getenv("SEAROUTES_API_KEY")
 HF_API_TOKEN: str | None = os.getenv("HF_API_TOKEN")
 GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
@@ -51,8 +53,8 @@ ERP_POLL_INTERVAL_SEC: int = 60            # 1 minute
 FEATURES: dict[str, bool] = {
     "commodity_prices": bool(ALPHA_VANTAGE_KEY),
     "news_feed": bool(NEWSAPI_KEY),
-    "port_marine": bool(MARINETRAFFIC_KEY),
-    "sea_routing": bool(SEAROUTES_API_KEY),
+    "port_marine": bool(MARINETRAFFIC_KEY or AISTREAM_API_KEY),
+    "sea_routing": bool(SEAROUTES_API_KEY or SEADISTANCES_API_KEY),
     "nlp_ner": bool(HF_API_TOKEN),
     "ai_playbooks": bool(GEMINI_API_KEY),
     "weather": True,   # Open-Meteo: always available
@@ -76,30 +78,30 @@ NUM_PLANTS: int = 5
 NUM_REGIONS: int = 12
 
 SUPPLIER_LOCATIONS: list[dict] = [
-    {"id": "SUP-01", "name": "Suzhou Plant", "lat": 31.299, "lon": 120.585, "country": "CN"},
-    {"id": "SUP-02", "name": "Stuttgart Hub", "lat": 48.775, "lon": 9.182, "country": "DE"},
-    {"id": "SUP-03", "name": "Pune Factory", "lat": 18.520, "lon": 73.856, "country": "IN"},
-    {"id": "SUP-04", "name": "Detroit Tier-1", "lat": 42.332, "lon": -83.046, "country": "US"},
-    {"id": "SUP-05", "name": "Monterrey Ops", "lat": 25.686, "lon": -100.316, "country": "MX"},
-    {"id": "SUP-06", "name": "Bochum Parts", "lat": 51.482, "lon": 7.216, "country": "DE"},
-    {"id": "SUP-07", "name": "Wuhan Components", "lat": 30.593, "lon": 114.305, "country": "CN"},
-    {"id": "SUP-08", "name": "Johannesburg Supply", "lat": -26.204, "lon": 28.047, "country": "ZA"},
+    {"id": "ZF-SUP-PUNE", "name": "ZF Pune Chakan Plant", "lat": 18.750, "lon": 73.850, "country": "IN"},
+    {"id": "ZF-SUP-CBE", "name": "ZF Coimbatore Hub", "lat": 11.016, "lon": 76.955, "country": "IN"},
+    {"id": "ZF-SUP-CHN", "name": "ZF Chennai Oragadam", "lat": 12.833, "lon": 80.016, "country": "IN"},
+    {"id": "ZF-SUP-BLR", "name": "ZF Bengaluru Tech", "lat": 12.971, "lon": 77.594, "country": "IN"},
+    {"id": "ZF-SUP-HYD", "name": "ZF Hyderabad Tech", "lat": 17.385, "lon": 78.486, "country": "IN"},
+    {"id": "ZF-SUP-MUM", "name": "ZF Mumbai Logistics", "lat": 19.076, "lon": 72.877, "country": "IN"},
+    {"id": "ZF-SUP-DEL", "name": "ZF Delhi NCR Hub", "lat": 28.613, "lon": 77.209, "country": "IN"},
+    {"id": "ZF-SUP-JKD", "name": "ZF Jamshedpur Foundry", "lat": 22.804, "lon": 86.202, "country": "IN"},
 ]
 
 PLANT_LOCATIONS: list[dict] = [
-    {"id": "PLT-01", "name": "ZF Saarbrücken", "lat": 49.234, "lon": 6.996},
-    {"id": "PLT-02", "name": "ZF Friedrichshafen", "lat": 47.653, "lon": 9.476},
-    {"id": "PLT-03", "name": "ZF Lemförde", "lat": 52.471, "lon": 8.370},
-    {"id": "PLT-04", "name": "ZF North America", "lat": 43.068, "lon": -85.448},
-    {"id": "PLT-05", "name": "ZF Asia Pacific", "lat": 31.224, "lon": 121.469},
+    {"id": "ZF-PLT-PUNE", "name": "ZF Pune Multi-Divisional", "lat": 18.750, "lon": 73.850},
+    {"id": "ZF-PLT-CHN", "name": "ZF Chennai CVCS Plant", "lat": 12.833, "lon": 80.016},
+    {"id": "ZF-PLT-BLR", "name": "ZF Bengaluru Global Tech Center", "lat": 12.971, "lon": 77.594},
+    {"id": "ZF-PLT-HYD", "name": "ZF Hyderabad IT Center", "lat": 17.385, "lon": 78.486},
+    {"id": "ZF-PLT-CBE", "name": "ZF Coimbatore Industrial", "lat": 11.016, "lon": 76.955},
 ]
 
 KEY_PORTS: list[dict] = [
-    {"id": "PORT-RTM", "name": "Rotterdam", "lat": 51.905, "lon": 4.480},
-    {"id": "PORT-SHA", "name": "Shanghai", "lat": 31.229, "lon": 121.474},
-    {"id": "PORT-LAX", "name": "Los Angeles / Long Beach", "lat": 33.754, "lon": -118.216},
-    {"id": "PORT-SIN", "name": "Singapore", "lat": 1.264, "lon": 103.820},
-    {"id": "PORT-HAM", "name": "Hamburg", "lat": 53.546, "lon": 9.966},
+    {"id": "PORT-NSA", "name": "Nhava Sheva (JNPT)", "lat": 18.950, "lon": 72.950},
+    {"id": "PORT-MUN", "name": "Mundra", "lat": 22.733, "lon": 69.700},
+    {"id": "PORT-MAA", "name": "Chennai Port", "lat": 13.100, "lon": 80.300},
+    {"id": "PORT-VTZ", "name": "Visakhapatnam", "lat": 17.683, "lon": 83.217},
+    {"id": "PORT-KND", "name": "Kandla (Deendayal)", "lat": 23.016, "lon": 70.216},
 ]
 
 SKU_IDS: list[str] = [

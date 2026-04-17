@@ -106,17 +106,17 @@ export default function DashboardOverview() {
       title: "Service Level",
       value: data.current.service_level_pct,
       unit: "%",
-      delta: data.delta_pct.service_level_pct.pct_improvement,
-      improved: data.delta_pct.service_level_pct.improved,
+      delta: data.delta_pct?.service_level_pct?.pct_improvement ?? 0,
+      improved: data.delta_pct?.service_level_pct?.improved ?? true,
       icon: TrendingUp,
       sparkData: getSpark(data.time_series.service_level_pct),
     },
     {
       title: "Logistics Cost",
-      value: (data.current.total_logistics_cost / 1000).toFixed(1),
-      unit: "k USD",
-      delta: data.delta_pct.total_logistics_cost.pct_improvement,
-      improved: data.delta_pct.total_logistics_cost.improved,
+      value: ((data.current.total_logistics_cost * 83) / 1000).toFixed(1), // Rough conversion for visual effect
+      unit: "k ₹",
+      delta: data.delta_pct?.total_logistics_cost?.pct_improvement ?? 0,
+      improved: data.delta_pct?.total_logistics_cost?.improved ?? true,
       icon: Package,
       sparkData: getSpark(data.time_series.inventory_turns), // Placeholder spark
     },
@@ -124,8 +124,8 @@ export default function DashboardOverview() {
       title: "CO2 Emissions",
       value: (data.current.co2_emissions_kg / 1000).toFixed(1),
       unit: "t CO2",
-      delta: data.delta_pct.co2_emissions_kg.pct_improvement,
-      improved: data.delta_pct.co2_emissions_kg.improved,
+      delta: data.delta_pct?.co2_emissions_kg?.pct_improvement ?? 0,
+      improved: data.delta_pct?.co2_emissions_kg?.improved ?? true,
       icon: Leaf,
       sparkData: getSpark([40, 35, 38, 32, 30, 28, 25]), // Trend mock
     },
@@ -133,11 +133,12 @@ export default function DashboardOverview() {
       title: "Avg Lead Time",
       value: data.current.avg_lead_time_days,
       unit: "days",
-      delta: data.delta_pct.avg_lead_time_days.pct_improvement,
-      improved: data.delta_pct.avg_lead_time_days.improved,
+      delta: data.delta_pct?.avg_lead_time_days?.pct_improvement ?? 0,
+      improved: data.delta_pct?.avg_lead_time_days?.improved ?? true,
       icon: Truck,
       sparkData: getSpark(data.time_series.avg_lead_time_days),
     },
+
   ];
 
   return (
@@ -173,8 +174,8 @@ export default function DashboardOverview() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={[
                 { name: "Service", cm: data.current.service_level_pct, bl: data.baseline.service_level_pct },
-                { name: "Cost (Idx)", cm: 100, bl: 100 + data.delta_pct.total_logistics_cost.pct_improvement },
-                { name: "CO2 (Idx)", cm: 100, bl: 100 + data.delta_pct.co2_emissions_kg.pct_improvement },
+                { name: "Cost (Idx)", cm: 100, bl: 100 + (data.delta_pct?.total_logistics_cost?.pct_improvement ?? 0) },
+                { name: "CO2 (Idx)", cm: 100, bl: 100 + (data.delta_pct?.co2_emissions_kg?.pct_improvement ?? 0) },
                 { name: "Inventory", cm: data.current.inventory_turns, bl: data.baseline.inventory_turns },
               ]}>
                 <XAxis 

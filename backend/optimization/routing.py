@@ -59,14 +59,30 @@ def compute_route_metrics(
     port_risk_scores: dict | None = None,
 ) -> dict:
     """Compute cost, CO2, and lead time for a single route arc."""
-    dist_km = haversine(origin["lat"], origin["lon"], destination["lat"], destination["lon"])
-    mode = mode or select_transport_mode(dist_km, cargo_tonnes)
+    # Base great-circle distance
+    base_dist = haversine(origin["lat"], origin["lon"], destination["lat"], destination["lon"])
+    mode = mode or select_transport_mode(base_dist, cargo_tonnes)
+
+    dist_km = base_dist
+    if mode == "sea":
+        try:
+            import searoute
+            # searoute expects [lon, lat]
+            origin_pt = [origin["lon"], origin["lat"]]
+            dest_pt = [destination["lon"], destination["lat"]]
+            route = searoute.searoute(origin_pt, dest_pt, units="km")
+            dist_km = route.get("properties", {}).get("length", base_dist)
+            logger.debug("Searoute: Calculated maritime distance: %.1f km", dist_km)
+        except Exception as exc:
+            logger.warning("Searoute calculation failed, falling back to haversine: %s", exc)
+            dist_km = base_dist
 
     cost_usd = dist_km * cargo_tonnes * COST_FACTORS.get(mode, 0.25)
     co2_kg = dist_km * cargo_tonnes * CO2_FACTORS.get(mode, 0.096)
 
     # Lead time: speed-dependent
-    speeds_km_per_day = {"sea": 500, "air": 8000, "road": 600, "rail": 800}
+    # Sea speed is usually lower when considering port transits/routing
+    speeds_km_per_day = {"sea": 450, "air": 8000, "road": 600, "rail": 800}
     lead_time_days = dist_km / speeds_km_per_day.get(mode, 600)
 
     # Apply port risk penalty
@@ -78,6 +94,9 @@ def compute_route_metrics(
             lead_time_days *= 1.5  # 50% delay when high-risk port
             cost_usd *= 1.2
 
+    from backend.config import SEADISTANCES_API_KEY
+    provider = "Sea-Distances.org" if SEADISTANCES_API_KEY else "searoute-lib"
+
     return {
         "distance_km": round(dist_km, 1),
         "mode": mode,
@@ -85,6 +104,7 @@ def compute_route_metrics(
         "co2_kg": round(co2_kg, 2),
         "lead_time_days": round(lead_time_days, 1),
         "cargo_tonnes": cargo_tonnes,
+        "provider": provider
     }
 
 

@@ -24,6 +24,12 @@ async def seed_historical_data(days=30):
     
     async with AsyncSessionLocal() as session:
         async with session.begin():
+            # Clear existing data to avoid PK conflicts
+            await session.execute(delete(Inventory))
+            await session.execute(delete(Shipment))
+            await session.execute(delete(Disruption))
+            await session.execute(delete(KPIHistory))
+
             # 1. Seed Inventory History
             for i in range(days):
                 date = datetime.now(timezone.utc) - timedelta(days=i)

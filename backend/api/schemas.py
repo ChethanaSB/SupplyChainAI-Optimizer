@@ -82,6 +82,11 @@ class RouteArc(BaseModel):
     cost_usd: float
     co2_kg: float
     lead_time_days: float
+    origin_lat: float
+    origin_lon: float
+    dest_lat: float
+    dest_lon: float
+    provider: Optional[str] = None
 
 
 class RouteOptResponse(BaseModel):
@@ -168,8 +173,8 @@ class KPIMetric(BaseModel):
 
 
 class KPIDashResponse(BaseModel):
-    current: dict[str, float]
-    baseline: dict[str, float]
+    current: dict[str, Any]
+    baseline: dict[str, Any]
     delta_pct: dict[str, KPIMetric]
     time_series: dict[str, list]
     period: str

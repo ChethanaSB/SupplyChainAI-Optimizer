@@ -21,6 +21,38 @@ export async function getDisruptions(): Promise<Disruption[]> {
   return resp.json();
 }
 
+export async function getDisruptionRisk(supplierIds: string = "all"): Promise<any> {
+    const resp = await fetch(`${API_BASE}/api/disruption/risk?supplier_ids=${supplierIds}`);
+    if (!resp.ok) throw new Error("Failed to fetch risk data");
+    return resp.json();
+}
+
+export async function getForecast(skuId: string, horizon: number = 30): Promise<any> {
+    const resp = await fetch(`${API_BASE}/api/forecast/${skuId}?horizon=${horizon}`);
+    if (!resp.ok) throw new Error("Failed to fetch forecast");
+    return resp.json();
+}
+
+export async function optimizeRouting(cargo: any[], constraints: any = {}): Promise<any> {
+    const resp = await fetch(`${API_BASE}/api/routing/optimize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cargo, constraints }),
+    });
+    if (!resp.ok) throw new Error("Failed to optimize routing");
+    return resp.json();
+}
+
+export async function runScenario(scenarioName: string, overrideParams: any = {}): Promise<any> {
+    const resp = await fetch(`${API_BASE}/api/scenario/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scenario_name: scenarioName, override_params: overrideParams }),
+    });
+    if (!resp.ok) throw new Error("Failed to run scenario");
+    return resp.json();
+}
+
 export async function triggerScenario(type: string, location: string): Promise<any> {
   const resp = await fetch(`${API_BASE}/api/scenario/simulate`, {
     method: "POST",
@@ -28,4 +60,10 @@ export async function triggerScenario(type: string, location: string): Promise<a
     body: JSON.stringify({ type, location, severity: "High" }),
   });
   return resp.json();
+}
+
+export async function getLiveVessels(): Promise<any[]> {
+    const resp = await fetch(`${API_BASE}/api/routing/vessels`);
+    if (!resp.ok) return [];
+    return resp.json();
 }

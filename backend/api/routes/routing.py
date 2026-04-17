@@ -40,6 +40,10 @@ async def optimize_routing(body: RoutingRequest):
             constraints=constraints,
         )
 
+        # Create lookups for coordinates
+        supplier_coords = {s["id"]: (s["lat"], s["lon"]) for s in SUPPLIER_LOCATIONS}
+        plant_coords = {p["id"]: (p["lat"], p["lon"]) for p in PLANT_LOCATIONS}
+
         routes = [
             RouteArc(
                 supplier_id=r["supplier_id"],
@@ -49,6 +53,11 @@ async def optimize_routing(body: RoutingRequest):
                 cost_usd=r["cost_usd"],
                 co2_kg=r["co2_kg"],
                 lead_time_days=r["lead_time_days"],
+                origin_lat=supplier_coords.get(r["supplier_id"], (0,0))[0],
+                origin_lon=supplier_coords.get(r["supplier_id"], (0,0))[1],
+                dest_lat=plant_coords.get(r["plant_id"], (0,0))[0],
+                dest_lon=plant_coords.get(r["plant_id"], (0,0))[1],
+                provider=r.get("provider"),
             )
             for r in result["routes"]
         ]
@@ -67,3 +76,10 @@ async def optimize_routing(body: RoutingRequest):
     except Exception as exc:
         logger.error("Routing optimize error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/vessels")
+async def get_realtime_vessels():
+    """Fetch recent vessel positions from Aisstream buffer."""
+    from backend.data.ingestion.ports import get_live_vessels
+    return get_live_vessels()
