@@ -72,7 +72,7 @@ async def _search_scrape_fallback(symbol: str) -> dict | None:
     logger.info("Using Search Scrape Fallback for %s", symbol)
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_API_KEY)
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=GEMINI_API_KEY)
         
         prompt = f"Search for current stock price of {symbol} on BSE India. Return only the numerical close price. Example: 1542.5"
         response = await llm.ainvoke(prompt)
