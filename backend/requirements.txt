@@ -11,6 +11,7 @@ pydantic-settings==2.6.1
 # ── Database ───────────────────────────────────────────────────────
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
+aiosqlite==0.20.0
 # psycopg2-binary==2.9.10
 # alembic==1.14.0
 
@@ -22,6 +23,7 @@ httpx==0.27.2
 aiohttp==3.11.7
 requests==2.32.3
 beautifulsoup4==4.12.3
+websockets>=12.0
 
 # ── Data Engineering ───────────────────────────────────────────────
 pandas==2.2.3
@@ -66,3 +68,5 @@ apscheduler==3.10.4
 python-dateutil==2.9.0
 tqdm==4.67.1
 loguru==0.7.2
+searoute>=1.2
+

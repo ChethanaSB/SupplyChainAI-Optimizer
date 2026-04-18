@@ -89,18 +89,26 @@ async def run_disruption_scenario(body: ScenarioRequest):
             model=playbook_data.get("model"),
         )
 
-        affected_routes = [
-            RouteArc(
-                supplier_id=r.get("supplier_id", ""),
-                plant_id=r.get("plant_id", ""),
-                mode=r.get("mode", "sea"),
-                distance_km=r.get("distance_km", 0),
-                cost_usd=r.get("cost_usd", 0),
-                co2_kg=r.get("co2_kg", 0),
-                lead_time_days=r.get("lead_time_days", 0),
+        affected_routes = []
+        for r in result["affected_routes"]:
+            sup = next((s for s in SUPPLIER_LOCATIONS if s["id"] == r["supplier_id"]), None)
+            plt = next((p for p in PLANT_LOCATIONS if p["id"] == r["plant_id"]), None)
+            
+            affected_routes.append(
+                RouteArc(
+                    supplier_id=r.get("supplier_id", ""),
+                    plant_id=r.get("plant_id", ""),
+                    mode=r.get("mode", "sea"),
+                    distance_km=r.get("distance_km", 0),
+                    cost_inr=r.get("cost_inr", 0),
+                    co2_kg=r.get("co2_kg", 0),
+                    lead_time_days=r.get("lead_time_days", 0),
+                    origin_lat=sup["lat"] if sup else 0.0,
+                    origin_lon=sup["lon"] if sup else 0.0,
+                    dest_lat=plt["lat"] if plt else 0.0,
+                    dest_lon=plt["lon"] if plt else 0.0,
+                )
             )
-            for r in result["affected_routes"]
-        ]
 
         delta = result["delta_kpis"]
         cost_pct = delta.get("total_cost_pct_change", 0)

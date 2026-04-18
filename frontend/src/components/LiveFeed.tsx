@@ -94,8 +94,7 @@ export default function LiveFeed() {
                 <div key={idx} className="p-3 rounded-xl bg-card hover:bg-secondary/40 border border-border/10 transition-all space-y-1">
                    <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                         {getIcon(event.type)}
-                         <span className="text-[10px] font-bold uppercase text-muted-foreground">
+                         <span className="text-[10px] font-black uppercase text-primary/70 tracking-widest">
                             {event.type.replace('_', ' ')}
                          </span>
                       </div>
@@ -106,6 +105,11 @@ export default function LiveFeed() {
                    <p className="text-xs text-foreground/90 leading-tight font-medium">
                       {(event.payload as any).message || "New activity detected in the network."}
                    </p>
+                   {(event.payload as any).url && (
+                     <a href={(event.payload as any).url} target="_blank" rel="noreferrer" className="text-[9px] text-primary hover:underline font-black uppercase mt-2 inline-block">
+                        View Signal Details
+                     </a>
+                   )}
                 </div>
               )) : (
                 <div className="py-12 text-center text-muted-foreground">

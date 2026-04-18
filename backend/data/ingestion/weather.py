@@ -41,6 +41,7 @@ async def fetch_weather_for_location(
 
         # Derive severe_weather_flag: WMO codes 65+ indicate heavy precipitation/storms
         daily_codes = data.get("daily", {}).get("weather_code", [])
+        daily_codes = [c for c in daily_codes if c is not None]
         data["severe_weather_flag"] = any(c >= 65 for c in daily_codes)
 
         return data

@@ -46,10 +46,20 @@ class SupplierRiskNode(BaseModel):
     lon: float
 
 
+class EWSItem(BaseModel):
+    month: str
+    date: str
+    hazard: str
+    prob: str
+    severity: str
+    mitigation: str
+
+
 class DisruptionResponse(BaseModel):
     nodes: list[SupplierRiskNode]
     network_risk_index: float
     news_articles: list[dict] = Field(default_factory=list)
+    ews_predictions: list[EWSItem] = Field(default_factory=list)
     computed_at: str
 
 
@@ -72,6 +82,7 @@ class RoutingRequest(BaseModel):
     cargo: list[CargoItem] = Field(default_factory=list)
     constraints: Optional[RouteConstraints] = None
     scenario: Optional[str] = None
+    objective_weights: Optional[dict[str, float]] = None
 
 
 class RouteArc(BaseModel):
@@ -79,7 +90,7 @@ class RouteArc(BaseModel):
     plant_id: str
     mode: str
     distance_km: float
-    cost_usd: float
+    cost_inr: float
     co2_kg: float
     lead_time_days: float
     origin_lat: float
@@ -172,11 +183,22 @@ class KPIMetric(BaseModel):
     improved: bool
 
 
+class ValidationReportResponse(BaseModel):
+    summary: str
+    metrics: dict[str, KPIMetric]
+    scenarios_tested: int
+    baseline_policy: str
+    optimization_method: str
+    recommendation: str
+    computed_at: str
+
+
 class KPIDashResponse(BaseModel):
     current: dict[str, Any]
     baseline: dict[str, Any]
     delta_pct: dict[str, KPIMetric]
     time_series: dict[str, list]
+    market_prices: list[dict[str, Any]] = Field(default_factory=list)
     period: str
     computed_at: str
     missing_features: list[str] = Field(default_factory=list)
@@ -189,3 +211,18 @@ class LiveEvent(BaseModel):
     payload: dict[str, Any]
     timestamp: str
     severity: Optional[str] = None  # HIGH | MEDIUM | LOW
+# ─── Intel Feed (Blog) ────────────────────────────────────────────────────────
+class IntelItem(BaseModel):
+    id: str
+    title: str
+    summary: str
+    source: str
+    url: str
+    timestamp: str
+    category: str  # GEOPOLITICAL | LOGISTICS | WEATHER | ECONOMY
+    sentiment: str  # POSITIVE | NEGATIVE | NEUTRAL
+    relevance_score: float
+
+class IntelResponse(BaseModel):
+    articles: list[IntelItem]
+    computed_at: str

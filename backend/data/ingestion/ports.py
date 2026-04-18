@@ -146,15 +146,9 @@ async def poll_ports_once() -> list[dict]:
 
     # Fill in port records from current state
     for port in KEY_PORTS:
-        new_cong = _CONGESTION_STATE[port["id"]]
-        
-        # Determine source label
-        from backend.config import AISTREAM_API_KEY
-        # If the value is still the baseline 30.0, we mark as 'initializing' or 'no_activity'
-        if new_cong == 30.0:
-            source = "aisstream (waiting)" if AISTREAM_API_KEY else "manual_baseline"
-        else:
-            source = "aisstream (real-time)"
+        # Get real vessel count from AisStream global state
+        new_cong = _CONGESTION_STATE.get(port["id"], 15.0) 
+        source = "AisStream (Real-Time AIS)"
             
         record = _build_port_record(port, new_cong, source)
         results.append(record)

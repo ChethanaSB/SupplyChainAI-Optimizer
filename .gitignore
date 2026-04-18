@@ -36,3 +36,10 @@ Thumbs.db
 # Project specific
 backend/data/synthetic_supply_chain.parquet
 chainmind.db
+brain/
+scratch/
+.gemini/
+.env.local
+.env
+backend_start.log
+*.log

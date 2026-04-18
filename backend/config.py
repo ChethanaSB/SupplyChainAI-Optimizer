@@ -36,6 +36,10 @@ SEADISTANCES_API_KEY: str | None = os.getenv("SEADISTANCES_API_KEY")
 SEAROUTES_API_KEY: str | None = os.getenv("SEAROUTES_API_KEY")
 HF_API_TOKEN: str | None = os.getenv("HF_API_TOKEN")
 GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
+ETH_RPC_URL: str | None = os.getenv("ETH_RPC_URL")
+ETH_PRIVATE_KEY: str | None = os.getenv("ETH_PRIVATE_KEY")
+GOOGLE_MAPS_API_KEY: str | None = os.getenv("GOOGLE_MAPS_API_KEY")
+ENABLE_BLOCKCHAIN: bool = os.getenv("ENABLE_BLOCKCHAIN", "false").lower() == "true"
 
 # ─── Open-Meteo (no key required) ────────────────────────────────────────────
 OPENMETEO_BASE_URL: str = os.getenv(
@@ -43,10 +47,10 @@ OPENMETEO_BASE_URL: str = os.getenv(
 )
 
 # ─── Polling intervals ────────────────────────────────────────────────────────
-WEATHER_POLL_INTERVAL_SEC: int = 15 * 60   # 15 minutes
-PRICE_POLL_INTERVAL_SEC: int = 24 * 3600   # 24 hours (rate-limit aware)
-PORT_POLL_INTERVAL_SEC: int = 15 * 60
-NEWS_POLL_INTERVAL_SEC: int = 15 * 60
+WEATHER_POLL_INTERVAL_SEC: int = 60         # 1 minute
+PRICE_POLL_INTERVAL_SEC: int = 60           # 1 minute
+PORT_POLL_INTERVAL_SEC: int = 60
+NEWS_POLL_INTERVAL_SEC: int = 30
 ERP_POLL_INTERVAL_SEC: int = 60            # 1 minute
 
 # ─── Feature flags derived from key availability ─────────────────────────────
@@ -57,6 +61,7 @@ FEATURES: dict[str, bool] = {
     "sea_routing": bool(SEAROUTES_API_KEY or SEADISTANCES_API_KEY),
     "nlp_ner": bool(HF_API_TOKEN),
     "ai_playbooks": bool(GEMINI_API_KEY),
+    "google_routing": bool(GOOGLE_MAPS_API_KEY),
     "weather": True,   # Open-Meteo: always available
 }
 
@@ -86,6 +91,10 @@ SUPPLIER_LOCATIONS: list[dict] = [
     {"id": "ZF-SUP-MUM", "name": "ZF Mumbai Logistics", "lat": 19.076, "lon": 72.877, "country": "IN"},
     {"id": "ZF-SUP-DEL", "name": "ZF Delhi NCR Hub", "lat": 28.613, "lon": 77.209, "country": "IN"},
     {"id": "ZF-SUP-JKD", "name": "ZF Jamshedpur Foundry", "lat": 22.804, "lon": 86.202, "country": "IN"},
+    {"id": "ZF-SUP-AHM", "name": "ZF Ahmedabad Castings", "lat": 23.0225, "lon": 72.5714, "country": "IN"},
+    {"id": "ZF-SUP-KOL", "name": "ZF Kolkata Distribution", "lat": 22.5726, "lon": 88.3639, "country": "IN"},
+    {"id": "ZF-SUP-GWA", "name": "ZF Gwalior Assembly", "lat": 26.2183, "lon": 78.1828, "country": "IN"},
+    {"id": "ZF-SUP-KOC", "name": "ZF Kochi Marine Div", "lat": 9.9312, "lon": 76.2673, "country": "IN"},
 ]
 
 PLANT_LOCATIONS: list[dict] = [
@@ -94,6 +103,8 @@ PLANT_LOCATIONS: list[dict] = [
     {"id": "ZF-PLT-BLR", "name": "ZF Bengaluru Global Tech Center", "lat": 12.971, "lon": 77.594},
     {"id": "ZF-PLT-HYD", "name": "ZF Hyderabad IT Center", "lat": 17.385, "lon": 78.486},
     {"id": "ZF-PLT-CBE", "name": "ZF Coimbatore Industrial", "lat": 11.016, "lon": 76.955},
+    {"id": "ZF-PLT-PAN", "name": "ZF Pantnagar Brakes", "lat": 29.022, "lon": 79.493},
+    {"id": "ZF-PLT-VAT", "name": "ZF Vapi Transmission", "lat": 20.370, "lon": 72.908},
 ]
 
 KEY_PORTS: list[dict] = [
@@ -109,12 +120,17 @@ SKU_IDS: list[str] = [
     "TIRE-R18", "BRAKE-KIT", "ECU-M1", "INFOTAINMENT-S", "TRANSMISSION-AUTO"
 ]
 
+PLANT_IDS: list[str] = [p["id"] for p in PLANT_LOCATIONS]
+
+# ─── Currency ─────────────────────────────────────────────────────────────────
+USD_TO_INR: float = 83.5  # Approximate USD → INR conversion rate
+
 # ─── Risk thresholds ─────────────────────────────────────────────────────────
 RISK_HIGH_THRESHOLD: int = 70
 RISK_MEDIUM_THRESHOLD: int = 40
 
 # ─── Optimization defaults ────────────────────────────────────────────────────
-OR_TOOLS_TIME_LIMIT_SEC: int = 30
+OR_TOOLS_TIME_LIMIT_SEC: int = 5
 CO2_BUDGET_KG_DEFAULT: float = 50_000.0
 
 # ─── Service level target ────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import httpx
 import redis.asyncio as aioredis
 
 from backend.config import NEWSAPI_KEY, HF_API_TOKEN, REDIS_URL, NEWS_POLL_INTERVAL_SEC, FEATURES
+from backend.data.ingestion.search_engine import search_engine
 
 logger = logging.getLogger("chainmind.news")
 
@@ -23,7 +24,10 @@ HF_NER_URL = "https://api-inference.huggingface.co/models/dslim/bert-base-NER"
 SEARCH_QUERY = (
     "ZF India logistics OR ZF Pune plant disruption "
     "OR ZF Chennai production delay OR ZF Coimbatore industrial "
-    "OR Indian automotive supply chain OR ZF mobility systems India"
+    "OR Indian automotive supply chain OR ZF mobility systems India "
+    "OR global port congestion 2026 OR Suez Canal transit update "
+    "OR Panama Canal drought impact OR major carrier blank sailings "
+    "OR aerospace supply chain disruption"
 )
 
 
@@ -41,10 +45,21 @@ async def _hf_request(client: httpx.AsyncClient, url: str, payload: dict) -> Any
         return None
 
 
-def _sentiment_to_score(sentiment_result: Any) -> tuple[float, str]:
-    """Convert HF sentiment output to numerical score."""
+def _sentiment_to_score(sentiment_result: Any, text: str = "") -> tuple[float, str]:
+    """Convert HF sentiment output to numerical score, with keyword fallback."""
     if not sentiment_result or not isinstance(sentiment_result, list):
+        # Keyword-based fallback for supply chain sentiment
+        lower_text = text.lower()
+        negative_keywords = ["strike", "disruption", "delay", "hike", "bottleneck", "shortage", "closed", "accident", "warning", "storm", "flood"]
+        positive_keywords = ["growth", "expansion", "profit", "digitalization", "improved", "connected", "opened", "launched"]
+        
+        if any(kw in lower_text for kw in negative_keywords):
+            return 0.82, "NEGATIVE"
+        if any(kw in lower_text for kw in positive_keywords):
+            return 0.25, "POSITIVE"
+            
         return 0.5, "NEUTRAL"
+        
     best = max(sentiment_result, key=lambda x: x.get("score", 0))
     label = best.get("label", "NEUTRAL")
     score = best.get("score", 0.5)
@@ -102,17 +117,34 @@ async def fetch_and_score_news(client: httpx.AsyncClient) -> list[dict]:
         articles = resp.json().get("articles", [])
     except Exception as exc:
         logger.error("NewsAPI fetch failed: %s", exc)
-        return []
+        articles = []
+
+    # ZF Enhancement: Use the highnd speed Google-like search engine for targeted results
+    try:
+        search_results = await search_engine.search(SEARCH_QUERY)
+        # Add high-intent search results to the pool
+        for sr in search_results:
+            # Check for duplicates or priority
+            if not any(a.get("title") == sr["title"] for a in articles):
+                articles.insert(0, {
+                    "title": sr["title"],
+                    "description": sr["description"],
+                    "source": {"name": sr["source"]},
+                    "url": sr["url"],
+                    "publishedAt": datetime.now(timezone.utc).isoformat()
+                })
+    except Exception as e:
+        logger.warning("ZF Search Engine failed: %s", e)
 
     scored = []
-    for article in articles[:10]:  # Rate limit: score top 10
+    for article in articles:  # Process all articles
         text = f"{article.get('title', '')}. {article.get('description', '')}"
         if not text.strip():
             continue
 
         # Sentiment
         sentiment_raw = await _hf_request(client, HF_SENTIMENT_URL, {"inputs": text[:512]})
-        senti_score, senti_label = _sentiment_to_score(sentiment_raw)
+        senti_score, senti_label = _sentiment_to_score(sentiment_raw, text=text)
         severity = _severity_from_sentiment(senti_score)
 
         # NER
@@ -128,6 +160,7 @@ async def fetch_and_score_news(client: httpx.AsyncClient) -> list[dict]:
         scored.append(
             {
                 "title": article.get("title", ""),
+                "summary": article.get("description", ""),
                 "source": article.get("source", {}).get("name", "Unknown"),
                 "url": article.get("url", ""),
                 "published_at": article.get("publishedAt", ""),

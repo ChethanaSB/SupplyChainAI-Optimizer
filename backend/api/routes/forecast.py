@@ -33,12 +33,14 @@ async def get_forecast(
             if known_skus and sku_id not in known_skus:
                 raise HTTPException(status_code=404, detail=f"SKU {sku_id} not found in dataset.")
 
-        result = ensemble_forecast(
+        # Innovative Step: Dynamic Model Selection (LSTM Sequence Prediction)
+        from backend.models.forecasting.lstm_model import predict_lstm
+        
+        result = predict_lstm(
             sku_id=sku_id,
             region_id=region,
             horizon=horizon,
-            df_history=df,
-            tft_available=False,  # Use ARIMA until TFT trained
+            df=df,
         )
 
         # Compute safety stock from historical data

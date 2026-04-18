@@ -103,7 +103,7 @@ app.add_middleware(
 )
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
-from backend.api.routes import forecast, disruption, routing, inventory, scenario, kpi, websocket
+from backend.api.routes import forecast, disruption, routing, inventory, scenario, kpi, websocket, intel
 
 app.include_router(forecast.router, prefix="/api/forecast", tags=["Forecast"])
 app.include_router(disruption.router, prefix="/api/disruption", tags=["Disruption"])
@@ -111,6 +111,7 @@ app.include_router(routing.router, prefix="/api/routing", tags=["Routing"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(scenario.router, prefix="/api/scenario", tags=["Scenario"])
 app.include_router(kpi.router, prefix="/api/kpi", tags=["KPI"])
+app.include_router(intel.router, prefix="/api/intel", tags=["Intel"])
 app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
 
 

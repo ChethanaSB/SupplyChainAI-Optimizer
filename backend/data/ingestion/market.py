@@ -12,14 +12,15 @@ from datetime import datetime, timezone
 import httpx
 import redis.asyncio as aioredis
 
-from backend.config import ALPHA_VANTAGE_KEY, REDIS_URL, PRICE_POLL_INTERVAL_SEC, FEATURES
+from backend.config import ALPHA_VANTAGE_KEY, REDIS_URL, PRICE_POLL_INTERVAL_SEC, FEATURES, GEMINI_API_KEY
 
 logger = logging.getLogger("chainmind.market")
 
 SYMBOLS = {
-    "USO": "crude_oil",
     "RELIANCE.BSE": "energy_industrial",
     "TATASTEEL.BSE": "steel",
+    "ADANIPORTS.BSE": "logistics_infrastructure",
+    "COALINDIA.BSE": "power_energy",
 }
 
 AV_BASE = "https://www.alphavantage.co/query"
@@ -44,7 +45,7 @@ async def fetch_symbol(client: httpx.AsyncClient, symbol: str) -> dict | None:
         data = resp.json()
         if "Time Series (Daily)" not in data:
             logger.warning("Alpha Vantage unexpected response for %s: %s", symbol, data.get("Note", data))
-            return None
+            return await _search_scrape_fallback(symbol)
         ts = data["Time Series (Daily)"]
         latest_date = sorted(ts.keys(), reverse=True)[0]
         latest = ts[latest_date]
@@ -59,11 +60,39 @@ async def fetch_symbol(client: httpx.AsyncClient, symbol: str) -> dict | None:
             "volume": int(latest["5. volume"]),
             "_fetched_at": datetime.now(timezone.utc).isoformat(),
         }
-    except ConfigError:
-        raise
     except Exception as exc:
         logger.warning("Alpha Vantage fetch failed for %s: %s", symbol, exc)
+        return await _search_scrape_fallback(symbol)
+
+async def _search_scrape_fallback(symbol: str) -> dict | None:
+    """Fallback: Scrape/Search current price using LLM + Search capabilities."""
+    if not GEMINI_API_KEY:
         return None
+    
+    logger.info("Using Search Scrape Fallback for %s", symbol)
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_API_KEY)
+        
+        prompt = f"Search for current stock price of {symbol} on BSE India. Return only the numerical close price. Example: 1542.5"
+        response = await llm.ainvoke(prompt)
+        price_str = response.content.strip()
+        # Basic extraction
+        import re
+        match = re.search(r"(\d+\.?\d*)", price_str)
+        if match:
+            price = float(match.group(1))
+            return {
+                "symbol": symbol,
+                "commodity": SYMBOLS.get(symbol, "industrial"),
+                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "close": price,
+                "_fetched_at": datetime.now(timezone.utc).isoformat(),
+                "source": "Google Search Scrape"
+            }
+    except Exception as e:
+        logger.error("Search Scrape failed: %s", e)
+    return None
 
 
 async def poll_prices_once() -> list[dict]:
