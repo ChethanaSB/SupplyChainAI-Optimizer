@@ -82,16 +82,20 @@ async def get_df_cached() -> Optional[pd.DataFrame]:
     try:
         async with AsyncSessionLocal() as session:
             from sqlalchemy import text
-            result = await session.execute(
-                text("SELECT * FROM supply_chain_daily LIMIT 200000")
-            )
-            rows = result.fetchall()
-            if rows:
-                _DF_CACHE = pd.DataFrame(rows, columns=result.keys())
-                logger.info("Loaded %d rows from PostgreSQL.", len(_DF_CACHE))
-                return _DF_CACHE
+            from sqlalchemy.exc import OperationalError, ProgrammingError
+            try:
+                result = await session.execute(
+                    text("SELECT * FROM supply_chain_daily LIMIT 200000")
+                )
+                rows = result.fetchall()
+                if rows:
+                    _DF_CACHE = pd.DataFrame(rows, columns=result.keys())
+                    logger.info("Loaded %d rows from PostgreSQL.", len(_DF_CACHE))
+                    return _DF_CACHE
+            except (OperationalError, ProgrammingError):
+                logger.info("No persistent supply_chain_daily database table found. Falling back to synthetic generation.")
     except Exception as exc:
-        logger.warning("PostgreSQL load failed: %s. Generating synthetic data.", exc)
+        logger.warning("PostgreSQL connection error: %s. Generating synthetic data.", exc)
 
     # Fall back to generating synthetic data
     try:
