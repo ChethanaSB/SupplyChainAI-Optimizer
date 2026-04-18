@@ -18,10 +18,10 @@ export default function LiveFeed() {
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    // Determine WS URL (handling local/prod)
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/live-feed`;
+    // Determine WS URL (handling local/prod cross-origin from frontend to render backend)
+    const wsUrl = process.env.NODE_ENV === "production" 
+      ? "wss://supplychainai-optimizer.onrender.com/ws/live-feed" 
+      : "ws://localhost:8000/ws/live-feed";
 
     const connect = () => {
       console.log("Connecting to WebSocket:", wsUrl);
