@@ -27,6 +27,14 @@ async def lifespan(app: FastAPI):
     if MISSING_KEYS:
         logger.warning("Disabled features (missing keys): %s", MISSING_KEYS)
 
+    # Initialize SQL Database Tables natively if they don't exist
+    try:
+        from backend.db.database import init_db
+        await init_db()
+        logger.info("SQL DB schemas verified.")
+    except Exception as exc:
+        logger.error("Failed to initialize database tables: %s", exc)
+
     # Connect Redis stream bus
     try:
         await bus.connect()
