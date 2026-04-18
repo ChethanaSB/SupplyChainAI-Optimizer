@@ -18,8 +18,16 @@ from backend.data.ingestion.search_engine import search_engine
 logger = logging.getLogger("chainmind.news")
 
 NEWSAPI_BASE = "https://newsapi.org/v2/everything"
-HF_SENTIMENT_URL = "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english"
-HF_NER_URL = "https://api-inference.huggingface.co/models/dslim/bert-base-NER"
+HF_SENTIMENT_URLS = [
+    "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english",
+    "https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment-latest",
+    "https://api-inference.huggingface.co/models/ProsusAI/finbert"
+]
+HF_NER_URLS = [
+    "https://api-inference.huggingface.co/models/dslim/bert-base-NER",
+    "https://api-inference.huggingface.co/models/dslim/bert-large-NER",
+    "https://api-inference.huggingface.co/models/Babelscape/wikineural-multilingual-ner"
+]
 
 SEARCH_QUERY = (
     "ZF India logistics OR ZF Pune plant disruption "
@@ -31,18 +39,23 @@ SEARCH_QUERY = (
 )
 
 
-async def _hf_request(client: httpx.AsyncClient, url: str, payload: dict) -> Any:
-    """Call HuggingFace Inference API."""
+async def _hf_request(client: httpx.AsyncClient, urls: list[str], payload: dict) -> Any:
+    """Call HuggingFace Inference API with cascading fallbacks."""
     if not HF_API_TOKEN:
         return None
     headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
-    try:
-        resp = await client.post(url, json=payload, headers=headers, timeout=30.0)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as exc:
-        logger.warning("HuggingFace request failed: %s", exc)
-        return None
+    
+    for url in urls:
+        try:
+            resp = await client.post(url, json=payload, headers=headers, timeout=15.0)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.debug("HuggingFace model %s failed: %s, attempting fallback...", url.split('/')[-1], exc)
+            continue
+            
+    logger.warning("All HuggingFace fallback models exhausted.")
+    return None
 
 
 def _sentiment_to_score(sentiment_result: Any, text: str = "") -> tuple[float, str]:
@@ -143,12 +156,12 @@ async def fetch_and_score_news(client: httpx.AsyncClient) -> list[dict]:
             continue
 
         # Sentiment
-        sentiment_raw = await _hf_request(client, HF_SENTIMENT_URL, {"inputs": text[:512]})
+        sentiment_raw = await _hf_request(client, HF_SENTIMENT_URLS, {"inputs": text[:512]})
         senti_score, senti_label = _sentiment_to_score(sentiment_raw, text=text)
         severity = _severity_from_sentiment(senti_score)
 
         # NER
-        ner_raw = await _hf_request(client, HF_NER_URL, {"inputs": text[:512]})
+        ner_raw = await _hf_request(client, HF_NER_URLS, {"inputs": text[:512]})
         entities = _extract_entities_from_ner(ner_raw)
 
         # Expiry: severity-based (high severity = longer impact)
