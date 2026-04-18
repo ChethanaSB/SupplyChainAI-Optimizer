@@ -121,3 +121,9 @@ async def execute_routing_plan(plan: dict):
     except Exception as exc:
         logger.error("Ledger execution error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+@router.get("/ledger")
+async def get_ledger_blocks():
+    """Fetch all immutable records from the ZF Green Ledger."""
+    from backend.blockchain.ledger import carbon_ledger
+    return carbon_ledger.get_chain_data()

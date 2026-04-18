@@ -22,9 +22,16 @@ class Block:
 class CO2Blockchain:
     def __init__(self):
         self.chain: List[Block] = [self.create_genesis_block()]
+        
+        # Seed initial blockchain records for the demo
+        self.add_emission_record("ZF-PUNE-ZF-HYDERABAD", 2.1, "ZF-TRUCK")
+        time.sleep(0.01)
+        self.add_emission_record("ZF-MUNDRA-ZF-DELHI", 12.8, "ZF-SEA")
+        time.sleep(0.01)
+        self.add_emission_record("ZF-CHENNAI-ZF-PUNE", 4.2, "ZF-TRUCK")
 
     def create_genesis_block(self) -> Block:
-        return Block(0, time.time(), {"message": "ZF Green Ledger Genesis"}, "0")
+        return Block(0, time.time() - 3600, {"message": "ZF Green Ledger Genesis"}, "0")
 
     def get_latest_block(self) -> Block:
         return self.chain[-1]

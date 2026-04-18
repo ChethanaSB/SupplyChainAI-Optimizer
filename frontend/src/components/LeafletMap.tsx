@@ -75,6 +75,15 @@ interface LeafletMapProps {
 export default function LeafletMap({ data, vessels, selectedRoute, simulatedMovement }: LeafletMapProps) {
   useEffect(() => {
     fixLeafletIcons();
+    
+    // Fix for Next.js Fast Refresh throwing "Map container is already initialized"
+    return () => {
+         const container = L.DomUtil.get('route-map-container');
+         if(container != null) {
+            // @ts-ignore
+            container._leaflet_id = null;
+         }
+    };
   }, []);
 
   const customIcon = new L.Icon({
@@ -85,6 +94,7 @@ export default function LeafletMap({ data, vessels, selectedRoute, simulatedMove
 
   return (
     <MapContainer
+      id="route-map-container"
       center={[20.5937, 78.9629]}
       zoom={5}
       className="h-full w-full z-0 grayscale-[0.05] contrast-[1.05]"

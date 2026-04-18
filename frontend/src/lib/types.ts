@@ -17,6 +17,9 @@ export interface KPIDashboardData {
     co2_emissions_kg: number;
     avg_lead_time_days: number;
     inventory_turns: number;
+    active_route_count?: number;
+    suppliers_synced?: number;
+    risk_exposure_index?: number;
   };
   baseline: {
     service_level_pct: number;

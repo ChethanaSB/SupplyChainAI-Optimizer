@@ -94,3 +94,9 @@ export async function executePlan(plan: any): Promise<any> {
     if (!resp.ok) throw new Error("Execution failed");
     return resp.json();
 }
+
+export async function getLedgerBlocks(): Promise<any[]> {
+    const resp = await fetch(`${API_BASE}/api/routing/ledger`);
+    if (!resp.ok) return [];
+    return resp.json();
+}
