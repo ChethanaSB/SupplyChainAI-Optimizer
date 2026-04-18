@@ -1,0 +1,35 @@
+services:
+  # 1. FastAPI Backend Service
+  - type: web
+    name: zf-logistics-backend
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      # Tell FastAPI it's running in production mode
+      - key: ENVIRONMENT
+        value: production
+
+  # 2. Next.js Frontend Service
+  - type: web
+    name: zf-logistics-frontend
+    env: node
+    # Build the frontend from the frontend directory
+    buildCommand: "cd frontend && npm install && npm run build"
+    # Start the standard Next.js Node server
+    startCommand: "cd frontend && npm start"
+    envVars:
+      - key: NODE_VERSION
+        value: ~20
+      # Dynamically inject the backend's URL into the frontend build
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: zf-logistics-backend
+          envVarKey: RENDER_EXTERNAL_URL
